@@ -12,6 +12,8 @@ with native TLS, SASL support, DCC transfers, and a BitchX-inspired terminal UI.
   -=> a BitchX-inspired irc client <=-
 ```
 
+[![Go](https://github.com/jrh-spg/beacon/actions/workflows/go.yml/badge.svg)](https://github.com/jrh-spg/beacon/actions/workflows/go.yml)
+
 ## Build
 
 ```sh

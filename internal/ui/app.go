@@ -19,7 +19,7 @@ import (
 	"beacon/internal/theme"
 )
 
-// Config carries connection defaults sourced from the CLI.
+// Config carries connection defaults sourced from startup options.
 type Config struct {
 	Server        string // host[:port]
 	UseTLS        bool

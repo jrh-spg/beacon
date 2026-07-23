@@ -35,10 +35,14 @@ A binary called `beacon` is produced in the current directory.
 ./beacon
 ```
 
+By default, beacon also reads `~/.config/beacon/config.yaml` if it exists.
+Use `-config <path>` to load a different YAML config file.
+
 ### Flags
 
 | Flag             | Meaning                                                |
 |------------------|--------------------------------------------------------|
+| `-config`        | YAML config file path                                  |
 | `-server`        | host (with optional `:port`) to connect to at start    |
 | `-port`          | port override (sets TLS automatically if 6697)         |
 | `-tls`           | use TLS for the initial server                         |
@@ -55,6 +59,32 @@ A binary called `beacon` is produced in the current directory.
 | `-password`      | server password (`PASS`)                               |
 | `-join`          | comma-separated channels to auto-join on connect       |
 | `-version`       | print version and exit                                 |
+
+### Config file
+
+The config file is a YAML object with fields matching the startup flags.
+Command-line flags override values from the file. `join` may be a YAML list or
+a comma-separated string.
+
+```yaml
+server: irc.libera.chat
+port: 6697
+tls: true
+tls-insecure: false
+cert: ~/.config/beacon/client.pem
+key: ~/.config/beacon/client.key
+sasl: EXTERNAL
+sasl-user: myaccount
+sasl-pass: ""
+nick: myhandle
+altnick: myhandle_
+user: myhandle
+realname: beacon user
+password: ""
+join:
+  - '#go-nuts'
+  - '#linux'
+```
 
 ## In-client commands
 

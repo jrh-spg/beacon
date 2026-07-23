@@ -14,7 +14,7 @@ import (
 // globalTSFmt is the live timestamp format used by fmtTime.
 // Changed via SetTimestampFormat (called by the /set timestamp_format handler).
 var (
-	tsFmtMu    sync.RWMutex
+	tsFmtMu     sync.RWMutex
 	globalTSFmt = "15:04:05"
 )
 
@@ -43,8 +43,10 @@ var mircColors = [16]string{
 // them as color tags. The result must NOT be additionally passed through
 // tview.Escape (that would double-escape the '[').
 func IRCFormat(s string) string {
+	s = expandEmojiCodes(s)
+
 	type fmtState struct {
-		fg, bg             int
+		fg, bg                 int
 		bold, ital, under, rev bool
 	}
 	cur := fmtState{fg: -1, bg: -1}
@@ -56,10 +58,18 @@ func IRCFormat(s string) string {
 		}
 		bg := "-"
 		attrs := ""
-		if st.bold  { attrs += "b" }
-		if st.ital  { attrs += "i" }
-		if st.under { attrs += "u" }
-		if st.rev   { attrs += "r" }
+		if st.bold {
+			attrs += "b"
+		}
+		if st.ital {
+			attrs += "i"
+		}
+		if st.under {
+			attrs += "u"
+		}
+		if st.rev {
+			attrs += "r"
+		}
 		if attrs == "" {
 			attrs = "-"
 		}
@@ -93,8 +103,12 @@ func IRCFormat(s string) string {
 					}
 				}
 			}
-			if fg > 15 { fg = 15 }
-			if bg > 15 { bg = 15 }
+			if fg > 15 {
+				fg = 15
+			}
+			if bg > 15 {
+				bg = 15
+			}
 			cur.fg, cur.bg = fg, bg
 			b.WriteString(tag(cur))
 		case '\x02': // bold
@@ -163,7 +177,8 @@ func line(t time.Time, body string) string {
 }
 
 // FormatPrivmsg renders a regular channel/query message as
-//   [HH:MM:SS] [nick] hello there
+//
+//	[HH:MM:SS] [nick] hello there
 func FormatPrivmsg(t time.Time, nick, prefix, text string, self, mention bool) string {
 	var n string
 	if self {
@@ -199,7 +214,7 @@ func FormatNotice(t time.Time, from, target, text string) string {
 		theme.Notice,
 		theme.NickOther, tview.Escape(from), theme.Notice,
 		theme.BracketHi, tview.Escape(target),
-		theme.Text, IRCFormat(text)) + theme.Reset)
+		theme.Text, IRCFormat(text))+theme.Reset)
 }
 
 // FormatJoin renders a JOIN event.
@@ -217,7 +232,7 @@ func FormatPart(t time.Time, nick, user, host, channel, reason string) string {
 	reasonPart := ""
 	if reason != "" {
 		reasonPart = fmt.Sprintf(" %s(%s%s%s)", theme.Bracket,
-				theme.Text+IRCFormat(reason)+theme.EventPart, theme.Bracket, theme.EventPart)
+			theme.Text+IRCFormat(reason)+theme.EventPart, theme.Bracket, theme.EventPart)
 	}
 	return line(t, fmt.Sprintf("%s%s %s%s%s (%s%s@%s%s) has left %s%s%s%s",
 		theme.EventPart, theme.ArrowOut,
@@ -284,7 +299,7 @@ func FormatServer(t time.Time, source, text string) string {
 		theme.Numeric,
 		theme.Server, tview.Escape(source), theme.Numeric,
 		theme.Numeric,
-		theme.Text, tview.Escape(text)) + theme.Reset)
+		theme.Text, tview.Escape(text))+theme.Reset)
 }
 
 // FormatError renders an error line.

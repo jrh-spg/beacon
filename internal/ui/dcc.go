@@ -32,9 +32,9 @@ type dccTransfer struct {
 // dccState aggregates pending offers and live transfers/chats.
 type dccState struct {
 	mu        sync.Mutex
-	offers    map[string]*dcc.Offer  // pending inbound offers keyed by peer nick (lowercased)
+	offers    map[string]*dcc.Offer // pending inbound offers keyed by peer nick (lowercased)
 	transfers map[int]*dccTransfer
-	chats     map[string]net.Conn     // active CHAT sockets keyed by peer nick (lowercased)
+	chats     map[string]net.Conn // active CHAT sockets keyed by peer nick (lowercased)
 	nextID    int
 }
 
@@ -401,6 +401,7 @@ func (a *App) runChat(peer string, c net.Conn) {
 // dccSendChat is called by the input dispatcher when the user types in a
 // DCC chat buffer.
 func (a *App) dccSendChat(peer, text string) bool {
+	text = expandEmojiCodes(text)
 	a.dcc.mu.Lock()
 	c := a.dcc.chats[strings.ToLower(peer)]
 	a.dcc.mu.Unlock()

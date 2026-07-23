@@ -101,6 +101,12 @@ func (a *App) completeForInput(text string) (base, suffix string, matches []stri
 	}
 
 	// Plain text in a channel/query — nick completion.
+	if strings.HasPrefix(token, ":") {
+		base = text[:lastSp+1]
+		return base, " ", completeEmoji(token)
+	}
+
+	// Plain text in a channel/query — nick completion.
 	suffix = " "
 	if lastSp == -1 {
 		// At the start of a fresh line follow the irssi convention of

@@ -45,19 +45,19 @@ type Config struct {
 type App struct {
 	cfg Config
 
-	tapp    *tview.Application
-	pages   *tview.Pages
-	root    *tview.Flex
-	status  *tview.TextView
-	title   *tview.TextView
-	input   *tview.InputField
+	tapp   *tview.Application
+	pages  *tview.Pages
+	root   *tview.Flex
+	status *tview.TextView
+	title  *tview.TextView
+	input  *tview.InputField
 
-	mu       sync.Mutex
-	buffers  []*Buffer
-	active   int
-	history  []string
-	histPos  int
-	comp     completerState
+	mu      sync.Mutex
+	buffers []*Buffer
+	active  int
+	history []string
+	histPos int
+	comp    completerState
 
 	connMu     sync.Mutex
 	conn       *irc.Conn
@@ -548,6 +548,7 @@ func (a *App) handleInputDone(key tcell.Key) {
 }
 
 func (a *App) sendToActive(text string) {
+	text = expandEmojiCodes(text)
 	b := a.activeBuffer()
 	if b.Kind == BufDCC {
 		// DCC chat buffers are named "=peer". Strip the prefix and write
@@ -925,7 +926,7 @@ func (a *App) dispatch(m *irc.Message) {
 			acct = m.Params[2]
 		}
 		a.printlnInfo(fmt.Sprintf("SASL: logged in as %s%s",
-			theme.WhoisNick, tview.Escape(acct))+theme.Reset)
+			theme.WhoisNick, tview.Escape(acct)) + theme.Reset)
 	case "903": // RPL_SASLSUCCESS
 		a.printlnInfo("SASL: authentication successful")
 		_ = a.conn.WriteRaw("CAP END")

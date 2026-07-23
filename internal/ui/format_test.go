@@ -2,6 +2,50 @@ package ui
 
 import "testing"
 
+func TestParseEmojiDB(t *testing.T) {
+	db := parseEmojiDB(":smile:\n🙂\nmalformed\n:smile:\n😄\n:blank:\n\n")
+	if got := db[":smile:"]; got != "😄" {
+		t.Fatalf("parseEmojiDB duplicate = %q, want 😄", got)
+	}
+	if _, ok := db[":blank:"]; ok {
+		t.Fatal("parseEmojiDB kept blank emoji entry")
+	}
+}
+
+func TestExpandEmojiCodes(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{in: "coffee :coffee:", want: "coffee ☕"},
+		{in: ":poop::coffee:", want: "💩☕"},
+		{in: "unknown :nope:", want: "unknown :nope:"},
+		{in: "unterminated :coffee", want: "unterminated :coffee"},
+	}
+	for _, c := range cases {
+		if got := expandEmojiCodes(c.in); got != c.want {
+			t.Errorf("expandEmojiCodes(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestIRCFormatExpandsEmojiCodes(t *testing.T) {
+	got := IRCFormat("hi :coffee: [ok]")
+	if got != "hi ☕ [[]ok]" {
+		t.Fatalf("IRCFormat emoji/bracket = %q", got)
+	}
+}
+
+func TestCompleteEmoji(t *testing.T) {
+	matches := completeEmoji(":poop")
+	if len(matches) != 1 || matches[0] != "💩" {
+		t.Fatalf("completeEmoji(:poop) = %#v, want [💩]", matches)
+	}
+	if matches := completeEmoji("poop"); len(matches) != 0 {
+		t.Fatalf("completeEmoji without colon = %#v, want none", matches)
+	}
+}
+
 func TestExtractCTCP(t *testing.T) {
 	cases := []struct {
 		in    string

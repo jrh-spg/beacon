@@ -90,6 +90,7 @@ func (a *App) runCommand(line string) {
 			a.printlnError("usage: /msg <target> <text>")
 			return
 		}
+		body = expandEmojiCodes(body)
 		if !a.requireConn() {
 			return
 		}
@@ -112,6 +113,7 @@ func (a *App) runCommand(line string) {
 			a.printlnError("usage: /me <action>")
 			return
 		}
+		args = expandEmojiCodes(args)
 		b := a.activeBuffer()
 		if b.Kind != BufChannel && b.Kind != BufQuery {
 			a.printlnError("/me needs a channel or query")
@@ -128,6 +130,7 @@ func (a *App) runCommand(line string) {
 			a.printlnError("usage: /notice <target> <text>")
 			return
 		}
+		body = expandEmojiCodes(body)
 		if !a.requireConn() {
 			return
 		}
@@ -461,7 +464,7 @@ func (a *App) cmdHelp() {
 		"--- keys ---",
 		"PgUp/PgDn  scroll      Home/End  jump to top / re-enable autoscroll",
 		"Ctrl+N/Ctrl+P  next/prev window  Alt+1..9  jump to window N",
-		"Tab  command + nick completion   Up/Down  input history",
+		"Tab  command + nick + emoji completion   Up/Down  input history",
 	}
 	for _, l := range lines {
 		a.writeRaw(a.statusBuf(), FormatInfo(time.Now(), l), ActLow)

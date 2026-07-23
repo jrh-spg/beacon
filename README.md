@@ -117,6 +117,16 @@ Settings cover reconnect behavior, default quit/part messages, alternate nick,
 CTCP replies, timestamp format, nick completion, mention beeps, auto-rejoin,
 DCC defaults, and logging defaults.
 
+## Emojis
+
+beacon expands GitHub/Campfire-style emoji triggers from the bundled
+`emojis-db.dat` database used by `jrh-spg/irssi-emojis`. Type `:coffee:`,
+`:poop:`, or another known trigger in a normal message, `/msg`, `/me`,
+`/notice`, or DCC chat and beacon sends the matching Unicode emoji. Incoming
+messages are also expanded for display.
+
+Press `Tab` while typing a `:trigger` token to complete it to the emoji.
+
 ## Autojoin
 
 `/autojoin add [#channel]` saves a channel to `~/.config/beacon/autojoin`.
@@ -147,7 +157,7 @@ with `/set dcc_auto_accept on`.
 | `Home` / `End`      | jump to top / re-enable autoscroll |
 | `Ctrl-N` / `Ctrl-P` | next / previous window       |
 | `Alt-1` … `Alt-9`   | jump to window N             |
-| `Tab`               | nick completion              |
+| `Tab`               | nick / command / emoji completion |
 | `Up` / `Down`       | input history                |
 | `Enter`             | send line                    |
 

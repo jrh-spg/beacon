@@ -26,6 +26,8 @@ func (a *App) runCommand(line string) {
 		a.cmdServer(args, false)
 	case "sslserver", "ssl":
 		a.cmdServer(args, true)
+	case "reconnect":
+		a.reconnect()
 	case "disconnect", "dc":
 		reason := args
 		if reason == "" {
@@ -423,6 +425,7 @@ func (a *App) cmdHelp() {
 		"/server <host>[:port] [tls]   connect to a server (alias /connect)",
 		"/sslserver <host>[:port]      connect with TLS (alias /ssl)",
 		"/disconnect [reason]          drop the current connection",
+		"/reconnect                    reconnect to the last used server",
 		"/quit [reason]                quit beacon",
 		"/nick <name>                  change your nick",
 		"/join <#chan> [key]           join a channel (alias /j)",

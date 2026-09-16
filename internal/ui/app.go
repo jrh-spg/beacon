@@ -64,6 +64,7 @@ type App struct {
 	registered bool
 	curNick    string
 	serverName string
+	lastTLS    bool // TLS setting used for serverName, for /reconnect
 
 	// runtime tunables and user-curated ignore list
 	settings  *settingsStore
@@ -145,6 +146,7 @@ func New(cfg Config) *App {
 	fmt.Fprint(status.View, theme.Banner(cfg.Version))
 	a.printlnInfo("welcome to beacon — type /help for commands")
 	a.refreshTitle()
+	a.refreshWindowTitle()
 
 	return a
 }
@@ -320,8 +322,14 @@ func (a *App) writeRaw(target *Buffer, text string, act ActivityLevel) {
 	if target == nil {
 		target = a.statusBuf()
 	}
+	text = strings.TrimSuffix(text, "\n")
+	_, _, width, _ := target.View.GetInnerRect()
+	text = wrapHangingText(text, width)
 	// The TextView's ChangedFunc schedules a debounced redraw, so this
 	// write is cheap even under heavy traffic.
+	if current := target.View.GetText(false); current != "" && !strings.HasSuffix(current, "\n") {
+		fmt.Fprint(target.View, "\n")
+	}
 	fmt.Fprint(target.View, text)
 	a.mu.Lock()
 	activityChanged := false
@@ -372,6 +380,23 @@ func (a *App) refreshTitle() {
 	}
 	a.title.SetText(s)
 	a.requestDraw()
+}
+
+// refreshWindowTitle updates the terminal emulator's own window title (as
+// opposed to the in-app title bar) so the active connection is visible from
+// outside beacon, e.g. in a tmux window list or OS taskbar.
+func (a *App) refreshWindowTitle() {
+	a.connMu.Lock()
+	server := a.serverName
+	registered := a.registered
+	nick := a.curNick
+	a.connMu.Unlock()
+
+	title := "beacon"
+	if registered && server != "" {
+		title = fmt.Sprintf("beacon: %s on %s", nick, server)
+	}
+	a.tapp.SetTitle(title)
 }
 
 func (a *App) refreshStatus() {
@@ -600,6 +625,7 @@ func (a *App) connect(addr string, useTLS bool) {
 	a.connMu.Lock()
 	a.conn = c
 	a.serverName = addr
+	a.lastTLS = useTLS
 	a.registered = false
 	a.connMu.Unlock()
 
@@ -619,6 +645,22 @@ func (a *App) connect(addr string, useTLS bool) {
 	go a.readLoop(c)
 }
 
+// reconnect dials the most recently used server (or the configured startup
+// server if never connected), regardless of current connection state.
+func (a *App) reconnect() {
+	a.connMu.Lock()
+	addr, useTLS := a.serverName, a.lastTLS
+	a.connMu.Unlock()
+	if addr == "" {
+		addr, useTLS = a.cfg.Server, a.cfg.UseTLS
+	}
+	if addr == "" {
+		a.printlnError("no server to reconnect to — try /server <host> [+port]")
+		return
+	}
+	go a.connect(addr, useTLS)
+}
+
 func (a *App) disconnect(reason string) {
 	a.connMu.Lock()
 	c := a.conn
@@ -630,6 +672,7 @@ func (a *App) disconnect(reason string) {
 		_ = c.Close()
 		a.printlnInfo("disconnected: " + reason)
 		a.refreshStatus()
+		a.refreshWindowTitle()
 	}
 }
 
@@ -656,6 +699,7 @@ func (a *App) readLoop(c *irc.Conn) {
 			}
 			a.connMu.Unlock()
 			a.refreshStatus()
+			a.refreshWindowTitle()
 			return
 		}
 		a.dispatch(msg)
@@ -735,6 +779,7 @@ func (a *App) dispatch(m *irc.Message) {
 		newNick := m.Trailing()
 		if strings.EqualFold(m.Nick, a.curNick) {
 			a.curNick = newNick
+			a.refreshWindowTitle()
 		}
 		a.mu.Lock()
 		bufs := append([]*Buffer(nil), a.buffers...)
@@ -747,11 +792,14 @@ func (a *App) dispatch(m *irc.Message) {
 	case "MODE":
 		target := m.Target()
 		modes := strings.Join(m.Params[1:], " ")
-		if b := a.findBuffer(target); b != nil {
-			a.writeRaw(b, FormatMode(now, m.Nick, target, modes), ActLow)
-		} else {
-			a.writeRaw(a.statusBuf(), FormatMode(now, m.Nick, target, modes), ActLow)
+		b := a.findBuffer(target)
+		if b == nil {
+			// Self usermode changes (target is our own nick, not a channel)
+			// have no owning buffer — show them in the active window instead
+			// of burying them in the status buffer.
+			b = a.activeBuffer()
 		}
+		a.writeRaw(b, FormatMode(now, m.Nick, target, modes), ActLow)
 	case "TOPIC":
 		ch := m.Target()
 		topic := m.Trailing()
@@ -791,6 +839,7 @@ func (a *App) dispatch(m *irc.Message) {
 		}
 		a.writeRaw(a.statusBuf(), FormatServer(now, m.Prefix, m.Trailing()), ActLow)
 		a.refreshStatus()
+		a.refreshWindowTitle()
 		for _, ch := range a.cfg.AutoJoin {
 			_ = a.conn.WriteRaw("JOIN " + ch)
 		}
@@ -950,7 +999,7 @@ func (a *App) dispatch(m *irc.Message) {
 		b := a.whoisTarget(nick)
 		a.writeRaw(b, FormatWhoisNotFound(now, nick), ActMsg)
 	case "311", "312", "313", "317", "318", "319", "301",
-		"330", "338", "378", "379", "671", "275", "307", "320":
+		"330", "338", "378", "379", "671", "275", "276", "307", "320":
 		a.onWhois(now, m)
 	default:
 		// numeric or unhandled — dump to status
@@ -1051,11 +1100,18 @@ func (a *App) onWhois(now time.Time, m *irc.Message) {
 		field("secure",
 			fmt.Sprintf("%s%s  %s",
 				theme.WhoisAccent, "TLS", theme.Reset)+WhoisValue(m.Trailing()))
+	case "276": // RPL_WHOISCERTFP
+		field("certfp", WhoisValue(whoisCertFPValue(m.Trailing())))
 	case "307": // is a registered nick (services)
 		field("registered", WhoisValue(m.Trailing()))
 	case "320": // is identified to services / extra info
 		field("extra", WhoisValue(m.Trailing()))
 	}
+}
+
+func whoisCertFPValue(trailing string) string {
+	fingerprint := strings.TrimSpace(trailing)
+	return strings.TrimPrefix(fingerprint, "has client certificate fingerprint ")
 }
 
 func (a *App) onPrivmsg(now time.Time, m *irc.Message, isNotice bool) {

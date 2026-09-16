@@ -21,6 +21,7 @@ type completerState struct {
 var allCommands = func() []string {
 	cmds := []string{
 		"server", "connect", "sslserver", "ssl", "disconnect", "dc",
+		"reconnect",
 		"quit", "exit",
 		"nick", "join", "j", "part", "leave", "close", "wc",
 		"msg", "query", "notice", "me", "action",

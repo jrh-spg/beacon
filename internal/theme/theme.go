@@ -15,7 +15,7 @@ import "fmt"
 // bold-white nicks, and saturated event colors.
 var (
 	// Chrome — cyan/blue structural chrome
-	Bracket    = "[#B7E7FC:-:-]" // cyan-blue frame pieces (others)
+	Bracket    = "[#FF94DB:-:-]" // bright pink frame pieces (others)
 	BracketSelf = "[#00ffff:-:-]" // bright cyan frame pieces (self)
 	BracketHi  = "[#00ffff:-:-]" // bright cyan
 	Frame     = "[#0000af:-:-]" // deep blue pipes/dashes
@@ -30,9 +30,9 @@ var (
 	Channel   = "[#FFD3F0:-:b]" // bright pink
 	Topic     = "[#00ffff:-:-]" // bright cyan
 
-	// Nicks — cyan-blue others, magenta ops, green voice, bold-white self
+	// Nicks — bright pink others, magenta ops, green voice, bold-white self
 	NickSelf  = "[#ffffff:-:b]"
-	NickOther = "[#B7E7FC:-:b]" // bold cyan-blue
+	NickOther = "[#ffff:-:b]" // bold bright pink
 	NickOp    = "[#FFD3F0:-:b]" // bright pink
 	NickVoice = "[#26C778:-:-]" // bright green
 

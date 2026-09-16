@@ -18,6 +18,8 @@ var (
 	globalTSFmt = "15:04:05"
 )
 
+const hangMarker = "\x00beacon-hang:"
+
 // SetTimestampFormat updates the live timestamp format string.
 func SetTimestampFormat(f string) {
 	tsFmtMu.Lock()
@@ -49,7 +51,8 @@ func IRCFormat(s string) string {
 		fg, bg                 int
 		bold, ital, under, rev bool
 	}
-	cur := fmtState{fg: -1, bg: -1}
+	clean := fmtState{fg: -1, bg: -1}
+	cur := clean
 
 	tag := func(st fmtState) string {
 		fg := "-"
@@ -128,7 +131,7 @@ func IRCFormat(s string) string {
 			b.WriteString(tag(cur))
 			i++
 		case '\x0f': // reset all
-			cur = fmtState{fg: -1, bg: -1}
+			cur = clean
 			b.WriteString("[-:-:-]")
 			i++
 		case '[': // escape literal bracket so tview doesn't treat it as a tag
@@ -138,6 +141,9 @@ func IRCFormat(s string) string {
 			b.WriteByte(ch)
 			i++
 		}
+	}
+	if cur != clean {
+		b.WriteString("[-:-:-]")
 	}
 	return b.String()
 }
@@ -176,6 +182,78 @@ func line(t time.Time, body string) string {
 	return fmt.Sprintf("%s %s\n", fmtTime(t), body)
 }
 
+func hangLine(indent int, text string) string {
+	return fmt.Sprintf("%s%d\x00%s", hangMarker, indent, text)
+}
+
+func wrapHangingText(text string, width int) string {
+	if width <= 0 || !strings.Contains(text, hangMarker) {
+		return text
+	}
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		indent, content, ok := parseHangLine(line)
+		if !ok {
+			continue
+		}
+		lines[i] = wrapHangingLine(content, width, indent)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func parseHangLine(line string) (int, string, bool) {
+	if !strings.HasPrefix(line, hangMarker) {
+		return 0, line, false
+	}
+	rest := strings.TrimPrefix(line, hangMarker)
+	end := strings.IndexByte(rest, '\x00')
+	if end < 0 {
+		return 0, line, false
+	}
+	indent := 0
+	for _, r := range rest[:end] {
+		if r < '0' || r > '9' {
+			return 0, line, false
+		}
+		indent = indent*10 + int(r-'0')
+	}
+	return indent, rest[end+1:], true
+}
+
+func wrapHangingLine(line string, width, indent int) string {
+	if tview.TaggedStringWidth(line) <= width || indent <= 0 || indent >= width-1 {
+		return line
+	}
+	var out []string
+	remaining := line
+	first := true
+	for remaining != "" {
+		wrapWidth := width
+		if !first {
+			wrapWidth = width - indent
+		}
+		parts := tview.WordWrap(remaining, wrapWidth)
+		if len(parts) == 0 || parts[0] == "" {
+			break
+		}
+		part := parts[0]
+		if !first {
+			part = strings.Repeat(" ", indent) + strings.TrimLeft(part, " ")
+		}
+		part = strings.TrimRight(part, " ")
+		out = append(out, part)
+		if len(parts) == 1 {
+			break
+		}
+		remaining = strings.TrimPrefix(remaining, parts[0])
+		first = false
+	}
+	if len(out) == 0 {
+		return line
+	}
+	return strings.Join(out, "\n")
+}
+
 // FormatPrivmsg renders a regular channel/query message as
 //
 //	[HH:MM:SS] [nick] hello there
@@ -194,8 +272,8 @@ func FormatPrivmsg(t time.Time, nick, prefix, text string, self, mention bool) s
 	if self {
 		br = theme.BracketSelf
 	}
-	return line(t, fmt.Sprintf("%s[%s%s] %s",
-		br, n, br, body))
+	linePrefix := fmt.Sprintf("%s %s[%s%s] ", fmtTime(t), br, n, br)
+	return hangLine(tview.TaggedStringWidth(linePrefix), linePrefix+body+"\n")
 }
 
 // FormatAction renders /me style action messages.
@@ -431,6 +509,10 @@ type CTCPSegment struct {
 // whoisLabelWidth keeps every field cleanly aligned in the block.
 const whoisLabelWidth = 10
 
+// whoisValueWrapWidth keeps long single-token values from wrapping after the
+// TextView has lost the whois frame prefix.
+const whoisValueWrapWidth = 48
+
 // whoisFrame returns the start/end frame chars in the whois color.
 func whoisFrame(s string) string {
 	return theme.WhoisFrame + s + theme.Reset
@@ -458,12 +540,35 @@ func FormatWhoisField(t time.Time, label, value string) string {
 	if len(pad) < whoisLabelWidth {
 		pad = pad + strings.Repeat(" ", whoisLabelWidth-len(pad))
 	}
-	return line(t, fmt.Sprintf("%s %s%s%s %s:%s %s",
-		whoisFrame("║"),
-		theme.WhoisLabel, pad, theme.Reset,
-		theme.WhoisFrame, theme.Reset,
-		value, // caller is responsible for escaping & coloring the value
-	))
+
+	var b strings.Builder
+	for i, part := range wrapWhoisValue(value) {
+		rowLabel := pad
+		if i > 0 {
+			rowLabel = strings.Repeat(" ", len(pad))
+		}
+		b.WriteString(line(t, fmt.Sprintf("%s %s%s%s %s:%s %s%s",
+			whoisFrame("║"),
+			theme.WhoisLabel, rowLabel, theme.Reset,
+			theme.WhoisFrame, theme.Reset,
+			part, theme.Reset, // caller is responsible for escaping & coloring the value
+		)))
+	}
+	return b.String()
+}
+
+func wrapWhoisValue(value string) []string {
+	if tview.TaggedStringWidth(value) <= whoisValueWrapWidth {
+		return []string{value}
+	}
+	parts := tview.WordWrap(value, whoisValueWrapWidth)
+	if len(parts) == 0 {
+		return []string{value}
+	}
+	for i, part := range parts {
+		parts[i] = strings.TrimRight(part, " ")
+	}
+	return parts
 }
 
 // FormatWhoisNotFound renders a compact "no such nick" error in whois style.

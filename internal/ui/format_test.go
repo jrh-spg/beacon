@@ -1,6 +1,10 @@
 package ui
 
-import "testing"
+import (
+	"strings"
+	"testing"
+	"time"
+)
 
 func TestParseEmojiDB(t *testing.T) {
 	db := parseEmojiDB(":smile:\n🙂\nmalformed\n:smile:\n😄\n:blank:\n\n")
@@ -33,6 +37,47 @@ func TestIRCFormatExpandsEmojiCodes(t *testing.T) {
 	got := IRCFormat("hi :coffee: [ok]")
 	if got != "hi ☕ [[]ok]" {
 		t.Fatalf("IRCFormat emoji/bracket = %q", got)
+	}
+}
+
+func TestIRCFormatClosesUnterminatedUnderline(t *testing.T) {
+	got := IRCFormat("before \x1funder")
+	want := "before [-:-:u]under[-:-:-]"
+	if got != want {
+		t.Fatalf("IRCFormat unterminated underline = %q, want %q", got, want)
+	}
+}
+
+func TestWrapHangingTextIndentsContinuation(t *testing.T) {
+	got := wrapHangingText(hangLine(4, "nick one two three four"), 13)
+	want := "nick one two\n    three\n    four"
+	if got != want {
+		t.Fatalf("wrapHangingText = %q, want %q", got, want)
+	}
+}
+
+func TestFormatWhoisFieldWrapsLongFingerprintInsideFrame(t *testing.T) {
+	fingerprint := strings.Repeat("a", 64)
+	got := FormatWhoisField(time.Date(2026, 8, 18, 15, 0, 0, 0, time.UTC), "secure", WhoisValue(fingerprint))
+	lines := strings.Split(strings.TrimSuffix(got, "\n"), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("FormatWhoisField long fingerprint lines = %d, want 2: %q", len(lines), got)
+	}
+	for _, line := range lines {
+		if !strings.Contains(line, "║") {
+			t.Fatalf("FormatWhoisField line missing whois frame: %q", line)
+		}
+	}
+	if !strings.Contains(lines[1], "          ") {
+		t.Fatalf("FormatWhoisField continuation is not label-aligned: %q", lines[1])
+	}
+}
+
+func TestWhoisCertFPValueTrimsLiberaPrefix(t *testing.T) {
+	fingerprint := strings.Repeat("a", 96)
+	got := whoisCertFPValue("has client certificate fingerprint " + fingerprint)
+	if got != fingerprint {
+		t.Fatalf("whoisCertFPValue = %q, want %q", got, fingerprint)
 	}
 }
 

@@ -32,7 +32,7 @@ var (
 
 	// Nicks — bright pink others, magenta ops, green voice, bold-white self
 	NickSelf  = "[#ffffff:-:b]"
-	NickOther = "[#ffff:-:b]" // bold bright pink
+	NickOther = "[#FF94DB:-:b]" // bold bright pink
 	NickOp    = "[#FFD3F0:-:b]" // bright pink
 	NickVoice = "[#26C778:-:-]" // bright green
 

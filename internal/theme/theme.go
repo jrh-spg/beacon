@@ -30,9 +30,9 @@ var (
 	Channel   = "[#FFD3F0:-:b]" // bright pink
 	Topic     = "[#00ffff:-:-]" // bright cyan
 
-	// Nicks — bright pink others, magenta ops, green voice, bold-white self
+	// Nicks — cyan-blue others, magenta ops, green voice, bold-white self
 	NickSelf  = "[#ffffff:-:b]"
-	NickOther = "[#FF94DB:-:b]" // bold bright pink
+	NickOther = "[#B7E7FC:-:b]" // bold cyan-blue
 	NickOp    = "[#FFD3F0:-:b]" // bright pink
 	NickVoice = "[#26C778:-:-]" // bright green
 

@@ -30,14 +30,14 @@ var (
 	Channel   = "[#FFD3F0:-:b]" // bright pink
 	Topic     = "[#00ffff:-:-]" // bright cyan
 
-	// Nicks — cyan-blue others, magenta ops, green voice, bold-white self
+	// Nicks — grey others, magenta ops, green voice, bold-white self
 	NickSelf  = "[#ffffff:-:b]"
-	NickOther = "[#B7E7FC:-:b]" // bold cyan-blue
+	NickOther = "[#c6c6c6:-:b]" // bold light grey
 	NickOp    = "[#FFD3F0:-:b]" // bright pink
 	NickVoice = "[#26C778:-:-]" // bright green
 
 	// Message text
-	Text      = "[#c6c6c6:-:-]" // light grey
+	Text      = "[#c6c6c6:-:b]" // light grey (bold, matches NickOther weight)
 	Action    = "[#FFD3F0:-:-]" // /me — bright pink
 	Notice    = "[#00ffff:-:b]" // bright cyan
 	CTCP      = "[#B7E7FC:-:-]" // cyan-blue

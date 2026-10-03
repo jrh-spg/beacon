@@ -117,3 +117,10 @@ func (b *Buffer) NickList() []string {
 	})
 	return out
 }
+
+// NickCount returns the number of nicks currently tracked for this buffer.
+func (b *Buffer) NickCount() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return len(b.Nicks)
+}

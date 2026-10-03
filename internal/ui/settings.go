@@ -236,6 +236,60 @@ func (s *settingsStore) def(key string) *settingDef {
 	return s.defs[key]
 }
 
+// settingsPath returns the path to the persisted runtime settings file.
+func settingsPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".config", "beacon", "settings")
+}
+
+// loadSettingsFile applies any saved key=value pairs on top of the defaults
+// already in s, returning the keys that were successfully applied so callers
+// can run side effects for them. Missing file is not an error.
+func loadSettingsFile(s *settingsStore) map[string]string {
+	data, err := os.ReadFile(settingsPath())
+	if err != nil {
+		return nil
+	}
+	applied := map[string]string{}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, val, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key, val = strings.TrimSpace(key), strings.TrimSpace(val)
+		if errMsg := s.Set(key, val); errMsg == "" {
+			applied[key] = val
+		}
+	}
+	return applied
+}
+
+// saveSettingsFile writes every current setting to disk as key=value lines.
+func saveSettingsFile(s *settingsStore) error {
+	p := settingsPath()
+	if err := os.MkdirAll(filepath.Dir(p), 0700); err != nil {
+		return err
+	}
+	var b strings.Builder
+	for _, kv := range s.All() {
+		fmt.Fprintf(&b, "%s=%s\n", kv[0], kv[1])
+	}
+	return os.WriteFile(p, []byte(b.String()), 0600)
+}
+
+// cmdSave implements /save by persisting the current settings to disk.
+func (a *App) cmdSave(args string) {
+	if err := saveSettingsFile(a.settings); err != nil {
+		a.printlnError("save: " + err.Error())
+		return
+	}
+	a.printlnInfo(fmt.Sprintf("settings saved to %s", settingsPath()))
+}
+
 // ignoreStore is a case-insensitive set of nicks whose messages should be
 // dropped on the floor by dispatch.
 type ignoreStore struct {
@@ -449,6 +503,18 @@ func (a *App) cmdIgnore(args string) {
 		}
 		a.printlnInfo("ignored: " + strings.Join(parts, " "))
 	}
+}
+
+func (a *App) cmdUnignore(args string) {
+	parts := strings.Fields(args)
+	if len(parts) == 0 {
+		a.printlnError("usage: /unignore <nick>...")
+		return
+	}
+	for _, n := range parts {
+		a.ignore.Remove(n)
+	}
+	a.printlnInfo("unignored: " + strings.Join(parts, " "))
 }
 
 // keep "time" import referenced even if it's added/removed during edits

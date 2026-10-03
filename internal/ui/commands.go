@@ -320,8 +320,12 @@ func (a *App) runCommand(line string) {
 		a.cmdSet(args)
 	case "toggle":
 		a.cmdToggle(args)
+	case "save":
+		a.cmdSave(args)
 	case "ignore":
 		a.cmdIgnore(args)
+	case "unignore":
+		a.cmdUnignore(args)
 	case "autojoin":
 		a.cmdAutojoin(args)
 	case "dcc":
@@ -461,7 +465,9 @@ func (a *App) cmdHelp() {
 		"/date | /time                 show local date/time",
 		"/set [key [value]]            view / change runtime settings",
 		"/toggle <key>                 toggle a boolean setting",
+		"/save                         save current settings to disk",
 		"/ignore [add|del|list] [nick] manage the ignore list",
+		"/unignore <nick>...           remove nick(s) from the ignore list",
 		"/autojoin [add|del|list] [#chan]  manage auto-joined channels (saved to disk)",
 		"/dcc list|send|chat|accept|close  direct client-to-client transfers",
 		"--- keys ---",

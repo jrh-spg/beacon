@@ -129,7 +129,9 @@ Type `/help` once running. Highlights:
 /date | /time                 show local date/time
 /set [key [value]]            view or change runtime settings
 /toggle <key>                 toggle a boolean setting
+/save                         save current settings to ~/.config/beacon/settings
 /ignore [add|del|list] [nick] manage ignored nicks
+/unignore <nick>...           remove nick(s) from the ignore list
 /autojoin [add|del|list] [#chan]  manage saved auto-joined channels
 /dcc list|send|chat|accept|close  DCC transfers and chat
 ```

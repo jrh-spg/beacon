@@ -32,7 +32,7 @@ var allCommands = func() []string {
 		"op", "deop", "voice", "devoice", "ban", "unban",
 		"invite", "cycle", "hop", "wallops", "who",
 		"echo", "version", "uptime", "lastlog", "eval",
-		"set", "toggle", "ignore",
+		"set", "toggle", "save", "ignore", "unignore",
 		"dcc",
 		"help", "h",
 	}
@@ -45,7 +45,7 @@ var allCommands = func() []string {
 var commandsTakingNick = map[string]bool{
 	"msg": true, "query": true, "whois": true, "ctcp": true, "ping": true,
 	"kick": true, "op": true, "deop": true, "voice": true, "devoice": true,
-	"ban": true, "unban": true, "invite": true, "ignore": true, "notice": true,
+	"ban": true, "unban": true, "invite": true, "ignore": true, "unignore": true, "notice": true,
 }
 
 // commandsTakingWindow lists commands whose first argument is a window

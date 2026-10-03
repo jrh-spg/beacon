@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -71,6 +72,11 @@ type App struct {
 	ignore    *ignoreStore
 	startedAt time.Time
 
+	// logFiles caches open per-buffer log file handles, keyed by lower-
+	// cased buffer name, when the log_enabled setting is on.
+	logMu    sync.Mutex
+	logFiles map[string]*os.File
+
 	// dcc holds pending offers and live transfers/chats
 	dcc *dccState
 
@@ -98,6 +104,10 @@ func New(cfg Config) *App {
 	}
 	a.dcc = newDCCState()
 	a.namesRequested = map[string]struct{}{}
+	loadedSettings := loadSettingsFile(a.settings)
+	for k, v := range loadedSettings {
+		a.applySettingSideEffect(k, v)
+	}
 	a.tapp = tview.NewApplication()
 	a.tapp.SetBeforeDrawFunc(func(s tcell.Screen) bool {
 		s.Clear()
@@ -129,10 +139,13 @@ func New(cfg Config) *App {
 	a.pages = tview.NewPages()
 	a.pages.SetBackgroundColor(tcell.ColorDefault)
 
+	statusSpacer := tview.NewBox().SetBackgroundColor(tcell.ColorDefault)
+
 	a.root = tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(a.title, 1, 0, false).
 		AddItem(a.pages, 0, 1, false).
-		AddItem(a.status, 3, 0, false).
+		AddItem(statusSpacer, 1, 0, false).
+		AddItem(a.status, 1, 0, false).
 		AddItem(a.input, 1, 0, true)
 	a.root.SetBackgroundColor(tcell.ColorDefault)
 
@@ -170,6 +183,7 @@ func (a *App) Run() error {
 // Stop gracefully shuts the app down.
 func (a *App) Stop() {
 	a.disconnect("client exiting")
+	a.closeLogs()
 	close(a.stopDraw)
 	a.tapp.Stop()
 }
@@ -323,6 +337,7 @@ func (a *App) writeRaw(target *Buffer, text string, act ActivityLevel) {
 		target = a.statusBuf()
 	}
 	text = strings.TrimSuffix(text, "\n")
+	a.logMessage(target, text)
 	_, _, width, _ := target.View.GetInnerRect()
 	text = wrapHangingText(text, width)
 	// The TextView's ChangedFunc schedules a debounced redraw, so this
@@ -439,32 +454,19 @@ func (a *App) refreshStatus() {
 		if b.Modes != "" {
 			modes = fmt.Sprintf("(%s)", tview.Escape(b.Modes))
 		}
+		count := ""
+		if b.Kind == BufChannel {
+			count = fmt.Sprintf("(%d)", b.NickCount())
+		}
 		parts = append(parts,
-			fmt.Sprintf("%s[%s%d:%s%s%s%s%s]", theme.StatusBrack,
+			fmt.Sprintf("%s[%s%d:%s%s%s%s%s%s]", theme.StatusBrack,
 				marker, i+1,
 				nameColor, tview.Escape(b.Name), theme.StatusBrack,
-				modes, theme.StatusBrack))
+				modes, count, theme.StatusBrack))
 	}
 	a.mu.Unlock()
 	statusLine := strings.Join(parts, " ")
-	_, _, statusWidth, _ := a.status.GetInnerRect()
-	pad := func(left string, right string) string {
-		spaces := statusWidth - tview.TaggedStringWidth(left) - tview.TaggedStringWidth(right)
-		if spaces < 1 {
-			spaces = 1
-		}
-		return strings.Repeat(" ", spaces)
-	}
-	topLeft := fmt.Sprintf("%s ▄▄%s", theme.StatusBrack, theme.Reset)
-	middleLeft := fmt.Sprintf("%s█%s %s", theme.StatusBrack, theme.Reset, statusLine)
-	bottomLeft := fmt.Sprintf("%s·▀ ▀%s", theme.StatusBrack, theme.Reset)
-	topRight := fmt.Sprintf("%s▄· %s", theme.StatusBrack, theme.Reset)
-	middleRight := fmt.Sprintf("%s  █%s", theme.StatusBrack, theme.Reset)
-	bottomRight := fmt.Sprintf("%s▀▀ %s", theme.StatusBrack, theme.Reset)
-	a.status.SetText(fmt.Sprintf("%s%s%s\n%s%s%s\n%s%s%s",
-		topLeft, pad(topLeft, topRight), topRight,
-		middleLeft, pad(middleLeft, middleRight), middleRight,
-		bottomLeft, pad(bottomLeft, bottomRight), bottomRight))
+	a.status.SetText(statusLine)
 	a.requestDraw()
 }
 

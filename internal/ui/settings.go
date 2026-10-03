@@ -449,6 +449,10 @@ func (a *App) applySettingSideEffect(key, val string) {
 			}
 			a.mu.Unlock()
 		}
+	case "log_enabled":
+		if val == "true" {
+			a.startLogging()
+		}
 	}
 }
 

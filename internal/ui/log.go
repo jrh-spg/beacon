@@ -59,6 +59,40 @@ func (a *App) logMessage(b *Buffer, text string) {
 	fmt.Fprintf(f, "[%s] %s\n", time.Now().Format(tsFormat), stripFormatting(text))
 }
 
+// startLogging eagerly opens log files (and creates the needed directories)
+// for every current channel/query buffer, so logging begins immediately when
+// log_enabled is turned on rather than waiting for the next message.
+func (a *App) startLogging() {
+	dir := a.settings.Get("log_dir")
+	if dir == "" {
+		home, _ := os.UserHomeDir()
+		dir = filepath.Join(home, "irclogs")
+	}
+	os.MkdirAll(dir, 0700)
+
+	a.connMu.Lock()
+	server := a.serverName
+	a.connMu.Unlock()
+	if server == "" {
+		return
+	}
+
+	a.mu.Lock()
+	names := make([]string, 0, len(a.buffers))
+	for _, b := range a.buffers {
+		if b.Kind == BufChannel || b.Kind == BufQuery {
+			names = append(names, b.Name)
+		}
+	}
+	a.mu.Unlock()
+
+	a.logMu.Lock()
+	defer a.logMu.Unlock()
+	for _, name := range names {
+		a.openLogFileLocked(server, name)
+	}
+}
+
 // openLogFileLocked returns the cached log file handle for server/name,
 // opening and caching it on first use. Caller must hold a.logMu.
 func (a *App) openLogFileLocked(server, name string) (*os.File, error) {

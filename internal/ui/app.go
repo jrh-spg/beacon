@@ -740,6 +740,9 @@ func (a *App) dispatch(m *irc.Message) {
 		if strings.EqualFold(m.Nick, a.curNick) {
 			b := a.addBuffer(ch, BufChannel)
 			a.switchToName(b.Name)
+			if a.conn != nil {
+				_ = a.conn.WriteRaw("MODE " + ch)
+			}
 		}
 		if b := a.findBuffer(ch); b != nil {
 			b.AddNick(m.Nick, "")
@@ -800,6 +803,9 @@ func (a *App) dispatch(m *irc.Message) {
 			// have no owning buffer — show them in the active window instead
 			// of burying them in the status buffer.
 			b = a.activeBuffer()
+		} else if irc.IsChannel(target) && len(m.Params) > 1 {
+			b.ApplyModeDelta(m.Params[1], m.Params[2:])
+			a.refreshStatus()
 		}
 		a.writeRaw(b, FormatMode(now, m.Nick, target, modes), ActLow)
 	case "TOPIC":
@@ -847,6 +853,14 @@ func (a *App) dispatch(m *irc.Message) {
 		}
 		for _, ch := range loadAutojoin() {
 			_ = a.conn.WriteRaw("JOIN " + ch)
+		}
+	case "324": // RPL_CHANNELMODEIS
+		if len(m.Params) >= 3 {
+			ch := m.Params[1]
+			if b := a.findBuffer(ch); b != nil {
+				b.SetModeState(m.Params[2], m.Params[3:])
+				a.refreshStatus()
+			}
 		}
 	case "332": // RPL_TOPIC
 		if len(m.Params) >= 3 {

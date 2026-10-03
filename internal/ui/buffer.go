@@ -40,7 +40,8 @@ type Buffer struct {
 	Nicks    map[string]string // nick -> prefix ("@","+","")
 	Activity ActivityLevel
 
-	mu sync.Mutex
+	mu        sync.Mutex
+	modeFlags map[byte]string // channel mode letter -> parameter (if any)
 }
 
 // MaxBufferLines is the per-window scrollback cap; older lines are trimmed
@@ -123,4 +124,111 @@ func (b *Buffer) NickCount() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return len(b.Nicks)
+}
+
+// Channel mode letter classes, used to decide whether a mode letter takes a
+// parameter and whether it belongs in the buffer's displayed mode string.
+// Without ISUPPORT CHANMODES tracking we fall back to the common defaults
+// shared by most IRCd implementations.
+var (
+	chanModeListTypes  = map[byte]bool{'b': true, 'e': true, 'I': true}                       // ban/except/invex lists — not shown
+	chanModeUserPrefix = map[byte]bool{'o': true, 'v': true, 'h': true, 'a': true, 'q': true} // applies to a nick, not the channel
+	chanModeKeyParam   = map[byte]bool{'k': true}                                             // always takes a parameter
+	chanModeLimitParam = map[byte]bool{'l': true}                                             // takes a parameter only when being set
+)
+
+// ApplyModeDelta merges an incremental "+ntk key" / "-l" style mode change
+// (as received in a MODE message) into the buffer's tracked channel modes.
+func (b *Buffer) ApplyModeDelta(modeline string, args []string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.applyModeTokensLocked(modeline, args)
+	b.Modes = b.renderModesLocked()
+}
+
+// SetModeState replaces the buffer's tracked channel modes wholesale, as
+// received from a RPL_CHANNELMODEIS (324) reply.
+func (b *Buffer) SetModeState(modeline string, args []string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.modeFlags = map[byte]string{}
+	b.applyModeTokensLocked(modeline, args)
+	b.Modes = b.renderModesLocked()
+}
+
+// applyModeTokensLocked parses a mode string like "+ntk-l" against args,
+// updating b.modeFlags. Caller must hold b.mu.
+func (b *Buffer) applyModeTokensLocked(modeline string, args []string) {
+	if b.modeFlags == nil {
+		b.modeFlags = map[byte]string{}
+	}
+	adding := true
+	argi := 0
+	nextArg := func() string {
+		if argi < len(args) {
+			v := args[argi]
+			argi++
+			return v
+		}
+		return ""
+	}
+	for i := 0; i < len(modeline); i++ {
+		c := modeline[i]
+		switch {
+		case c == '+':
+			adding = true
+		case c == '-':
+			adding = false
+		case chanModeListTypes[c]:
+			nextArg() // ban/except/invex entries aren't channel-level flags
+		case chanModeUserPrefix[c]:
+			nextArg() // targets a nick, not the channel itself
+		case chanModeKeyParam[c]:
+			v := nextArg()
+			if adding {
+				b.modeFlags[c] = v
+			} else {
+				delete(b.modeFlags, c)
+			}
+		case chanModeLimitParam[c]:
+			if adding {
+				b.modeFlags[c] = nextArg()
+			} else {
+				delete(b.modeFlags, c)
+			}
+		default:
+			if adding {
+				b.modeFlags[c] = ""
+			} else {
+				delete(b.modeFlags, c)
+			}
+		}
+	}
+}
+
+// renderModesLocked builds the displayed "+flags params" string from
+// b.modeFlags. Caller must hold b.mu.
+func (b *Buffer) renderModesLocked() string {
+	if len(b.modeFlags) == 0 {
+		return ""
+	}
+	letters := make([]byte, 0, len(b.modeFlags))
+	for c := range b.modeFlags {
+		letters = append(letters, c)
+	}
+	sort.Slice(letters, func(i, j int) bool { return letters[i] < letters[j] })
+	var sb strings.Builder
+	sb.WriteByte('+')
+	var params []string
+	for _, c := range letters {
+		sb.WriteByte(c)
+		if v := b.modeFlags[c]; v != "" {
+			params = append(params, v)
+		}
+	}
+	for _, p := range params {
+		sb.WriteByte(' ')
+		sb.WriteString(p)
+	}
+	return sb.String()
 }

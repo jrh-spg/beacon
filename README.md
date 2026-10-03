@@ -149,6 +149,10 @@ Settings cover reconnect behavior, default quit/part messages, alternate nick,
 CTCP replies, timestamp format, nick completion, mention beeps, auto-rejoin,
 DCC defaults, and logging defaults.
 
+Changes only last for the current session unless you run `/save`, which
+writes the current values to `~/.config/beacon/settings`; they're loaded
+automatically the next time beacon starts.
+
 ## Emojis
 
 beacon expands GitHub/Campfire-style emoji triggers from the bundled
@@ -164,6 +168,16 @@ Press `Tab` while typing a `:trigger` token to complete it to the emoji.
 `/autojoin add [#channel]` saves a channel to `~/.config/beacon/autojoin`.
 `/autojoin del [#channel]` removes one, and `/autojoin list` prints the saved
 list. When no channel is supplied, the active channel is used.
+
+## Logging
+
+Turn logging on with `/set log_enabled on` (or `/toggle log_enabled`) to start
+writing every channel and query window to disk immediately, creating any
+directories needed. Logs land at `<log_dir>/<server>/<channel-or-nick>.log`,
+where `log_dir` defaults to `~/irclogs` and `<server>` is the host:port of the
+current connection. Lines are stripped of color formatting and prefixed with a
+timestamp (`log_timestamp`, default `15:04:05`). Run `/save` afterwards to
+keep logging enabled across restarts.
 
 ## DCC
 
@@ -198,13 +212,12 @@ To send a literal line that starts with `/`, double it: `//slashed`.
 ## Layout
 
 ```
-┌─ title bar (topic / window kind) ─────────────────────┐
-│                                                       │
-│ active buffer scrollback (BitchX-inspired styling)    │
-│                                                       │
-├─ status bar [time] [nick/conn] [1:(status)] [2:#chan] ┤
-│ [beacon] » _                                          │
-└───────────────────────────────────────────────────────┘
+title bar (topic / window kind)
+
+active buffer scrollback (BitchX-inspired styling)
+
+[time] [nick/conn] [1:(status)] [2:#chan(+nt)(5)]
+[beacon] » _
 ```
 
 ## Notes
